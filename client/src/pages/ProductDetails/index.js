@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { Button } from "antd";
+import { Button, Input, Avatar, InputNumber } from "antd";
+import { SendOutlined, UserOutlined, DollarOutlined } from '@ant-design/icons';
 import Divider from "../../components/Divider";
 
 // Mock Products data - same as in Home page
@@ -91,12 +92,43 @@ const mockProducts = [
   }
 ];
 
+// Mock chat messages
+const mockChatMessages = [
+  {
+    id: 1,
+    sender: "buyer",
+    message: "Hi, I'm interested in this product. Is it still available?",
+    timestamp: "10:30 AM",
+    bid: null
+  }
+];
+
 function ProductDetails() {
   const navigate = useNavigate();
   const { id } = useParams();
+  const [showChat, setShowChat] = useState(false);
+  const [message, setMessage] = useState("");
+  const [bidAmount, setBidAmount] = useState(null);
+  const [chatMessages, setChatMessages] = useState(mockChatMessages);
 
   // Get the product data based on ID
   const product = mockProducts.find(p => p._id === id);
+
+  const handleSendMessage = () => {
+    if (message.trim() === "" && !bidAmount) return;
+    
+    const newMessage = {
+      id: chatMessages.length + 1,
+      sender: "buyer",
+      message: message.trim(),
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      bid: bidAmount
+    };
+    
+    setChatMessages([...chatMessages, newMessage]);
+    setMessage("");
+    setBidAmount(null);
+  };
 
   if (!product) {
     return (
@@ -205,6 +237,7 @@ function ProductDetails() {
                     size="large"
                     block
                     className="h-12 text-lg"
+                    onClick={() => setShowChat(true)}
                   >
                     Contact Seller
                   </Button>
@@ -212,6 +245,88 @@ function ProductDetails() {
               </div>
             </div>
           </div>
+
+          {/* Chat Section */}
+          {showChat && (
+            <div className="border-t border-gray-200 mt-6">
+              <div className="p-6">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Chat with Seller</h2>
+                
+                {/* Chat Messages */}
+                <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex ${msg.sender === 'buyer' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[70%] rounded-lg p-3 ${
+                          msg.sender === 'buyer'
+                            ? 'bg-blue-500 text-white'
+                            : 'bg-gray-100 text-gray-900'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Avatar
+                            icon={<UserOutlined />}
+                            className={msg.sender === 'buyer' ? 'bg-blue-600' : 'bg-gray-400'}
+                          />
+                          <span className="text-sm font-medium">
+                            {msg.sender === 'buyer' ? 'You' : 'Seller'}
+                          </span>
+                        </div>
+                        <p>{msg.message}</p>
+                        {msg.bid && (
+                          <div className="mt-2 p-2 bg-white bg-opacity-20 rounded">
+                            <div className="flex items-center gap-2">
+                              <DollarOutlined />
+                              <span className="font-semibold">Bid: ₹{msg.bid}</span>
+                            </div>
+                          </div>
+                        )}
+                        <span className="text-xs opacity-75 mt-1 block">
+                          {msg.timestamp}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Message Input with Bid */}
+                <div className="space-y-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type your message..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onPressEnter={handleSendMessage}
+                      className="flex-1"
+                    />
+                    <InputNumber
+                      prefix="₹"
+                      placeholder="Bid amount"
+                      value={bidAmount}
+                      onChange={setBidAmount}
+                      min={1}
+                      max={product.price * 2}
+                      className="w-40"
+                    />
+                    <Button
+                      type="primary"
+                      icon={<SendOutlined />}
+                      onClick={handleSendMessage}
+                      className="flex items-center justify-center"
+                    >
+                      Send
+                    </Button>
+                  </div>
+                  <div className="text-sm text-gray-500">
+                    Original Price: ₹{product.price}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
