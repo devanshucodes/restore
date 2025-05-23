@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button, Input, Avatar, InputNumber } from "antd";
-import { SendOutlined, UserOutlined, DollarOutlined } from '@ant-design/icons';
+import { SendOutlined, UserOutlined, DollarOutlined, ArrowLeftOutlined, StarFilled } from '@ant-design/icons';
 import Divider from "../../components/Divider";
 
 // Mock PG data with real images
@@ -130,29 +130,63 @@ function ProductInfo() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg overflow-hidden">
+    <div className="min-h-screen bg-gray-50">
+      {/* Back Button */}
+      <div className="bg-white shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <Button 
+            icon={<ArrowLeftOutlined />}
+            onClick={() => navigate(-1)}
+            className="flex items-center"
+          >
+            Back to Home
+          </Button>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="flex flex-col md:flex-row">
             {/* Left Column - Images */}
-            <div className="md:w-1/2 p-6">
-              <div className="aspect-w-4 aspect-h-3 rounded-lg overflow-hidden">
+            <div className="md:w-1/2">
+              <div className="relative">
                 <img
                   src={pg.images[0]}
-                  className="w-full h-full object-cover"
+                  className="w-full h-[500px] object-cover"
                   alt={pg.name}
                 />
+                <div className="absolute top-4 right-4 bg-white px-3 py-1 rounded-full shadow-md">
+                  <span className="flex items-center gap-1 text-yellow-500">
+                    <StarFilled />
+                    {pg.rating}
+                  </span>
+                </div>
               </div>
             </div>
 
             {/* Right Column - Details */}
-            <div className="md:w-1/2 p-6">
+            <div className="md:w-1/2 p-8">
               <div className="space-y-6">
                 {/* Title and Description */}
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                  <h1 className="text-3xl font-bold text-gray-900 mb-3">
                     {pg.name}
                   </h1>
+                  <div className="flex items-center gap-4 text-gray-600 mb-4">
+                    <span className="flex items-center gap-1">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      {pg.location}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                      </svg>
+                      {pg.distance}
+                    </span>
+                  </div>
                   <p className="text-gray-600 text-lg">
                     {pg.description}
                   </p>
@@ -160,61 +194,41 @@ function ProductInfo() {
 
                 <Divider />
 
-                {/* Key Details */}
-                <div className="space-y-4">
-                  <h2 className="text-2xl font-semibold text-gray-900">
-                    PG Details
-                  </h2>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Price per month</p>
-                      <p className="text-xl font-semibold text-gray-900">₹{pg.price}</p>
+                {/* Price */}
+                <div className="bg-blue-50 p-6 rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-500">Monthly Rent</p>
+                      <p className="text-3xl font-bold text-gray-900">₹{pg.price}</p>
                     </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Location</p>
-                      <p className="text-xl font-semibold text-gray-900">{pg.location}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Distance</p>
-                      <p className="text-xl font-semibold text-gray-900">{pg.distance}</p>
-                    </div>
-                    <div className="bg-gray-50 p-4 rounded-lg">
-                      <p className="text-sm text-gray-500">Rating</p>
-                      <p className="text-xl font-semibold text-gray-900">{pg.rating}/5</p>
-                    </div>
+                    <Button 
+                      type="primary" 
+                      size="large"
+                      className="h-12 px-8 text-lg"
+                      onClick={() => setShowChat(true)}
+                    >
+                      Contact Owner
+                    </Button>
                   </div>
                 </div>
-
-                <Divider />
 
                 {/* Amenities */}
                 <div className="space-y-4">
                   <h2 className="text-2xl font-semibold text-gray-900">
                     Amenities
                   </h2>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid grid-cols-2 gap-4">
                     {pg.amenities.map((amenity, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm"
-                      >
-                        {amenity}
-                      </span>
+                      <div key={index} className="flex items-center gap-2 bg-gray-50 p-3 rounded-lg">
+                        <span className="text-blue-500">
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </span>
+                        <span className="text-gray-700">{amenity}</span>
+                      </div>
                     ))}
                   </div>
-                </div>
-
-                {/* Contact Button */}
-                <div className="pt-6">
-                  <Button 
-                    type="primary" 
-                    size="large"
-                    block
-                    className="h-12 text-lg"
-                    onClick={() => setShowChat(true)}
-                  >
-                    Contact Owner
-                  </Button>
                 </div>
               </div>
             </div>
@@ -222,25 +236,25 @@ function ProductInfo() {
 
           {/* Chat Section */}
           {showChat && (
-            <div className="border-t border-gray-200 mt-6">
-              <div className="p-6">
-                <h2 className="text-2xl font-semibold text-gray-900 mb-4">Chat with Owner</h2>
+            <div className="border-t border-gray-200">
+              <div className="p-8">
+                <h2 className="text-2xl font-semibold text-gray-900 mb-6">Chat with Owner</h2>
                 
                 {/* Chat Messages */}
-                <div className="space-y-4 mb-6 max-h-96 overflow-y-auto">
+                <div className="space-y-4 mb-6 max-h-96 overflow-y-auto px-4">
                   {chatMessages.map((msg) => (
                     <div
                       key={msg.id}
                       className={`flex ${msg.sender === 'buyer' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[70%] rounded-lg p-3 ${
+                        className={`max-w-[70%] rounded-2xl p-4 ${
                           msg.sender === 'buyer'
                             ? 'bg-blue-500 text-white'
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-2">
                           <Avatar
                             icon={<UserOutlined />}
                             className={msg.sender === 'buyer' ? 'bg-blue-600' : 'bg-gray-400'}
@@ -249,16 +263,16 @@ function ProductInfo() {
                             {msg.sender === 'buyer' ? 'You' : 'Owner'}
                           </span>
                         </div>
-                        <p>{msg.message}</p>
+                        <p className="text-lg">{msg.message}</p>
                         {msg.bid && (
-                          <div className="mt-2 p-2 bg-white bg-opacity-20 rounded">
+                          <div className="mt-3 p-3 bg-white bg-opacity-20 rounded-xl">
                             <div className="flex items-center gap-2">
-                              <DollarOutlined />
-                              <span className="font-semibold">Bid: ₹{msg.bid}/month</span>
+                              <DollarOutlined className="text-lg" />
+                              <span className="font-semibold text-lg">Bid: ₹{msg.bid}/month</span>
                             </div>
                           </div>
                         )}
-                        <span className="text-xs opacity-75 mt-1 block">
+                        <span className="text-xs opacity-75 mt-2 block">
                           {msg.timestamp}
                         </span>
                       </div>
@@ -267,14 +281,14 @@ function ProductInfo() {
                 </div>
 
                 {/* Message Input with Bid */}
-                <div className="space-y-4">
-                  <div className="flex gap-2">
+                <div className="space-y-4 px-4">
+                  <div className="flex gap-3">
                     <Input
                       placeholder="Type your message..."
                       value={message}
                       onChange={(e) => setMessage(e.target.value)}
                       onPressEnter={handleSendMessage}
-                      className="flex-1"
+                      className="flex-1 h-12 text-lg"
                     />
                     <InputNumber
                       prefix="₹"
@@ -283,13 +297,13 @@ function ProductInfo() {
                       onChange={setBidAmount}
                       min={1}
                       max={pg.price * 2}
-                      className="w-40"
+                      className="w-48 h-12 text-lg"
                     />
                     <Button
                       type="primary"
                       icon={<SendOutlined />}
                       onClick={handleSendMessage}
-                      className="flex items-center justify-center"
+                      className="h-12 px-6 text-lg"
                     >
                       Send
                     </Button>
