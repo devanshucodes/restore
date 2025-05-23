@@ -1,30 +1,89 @@
 import React, { useState, useEffect } from "react";
 import { Button, Select, message } from "antd";
-import { MapPinOutlined, WarningOutlined } from "@ant-design/icons";
+import { MapPinOutlined, WarningOutlined, AimOutlined } from "@ant-design/icons";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+
+// Fix for default marker icons in Leaflet with React
+delete L.Icon.Default.prototype._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
+  iconUrl: require("leaflet/dist/images/marker-icon.png"),
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
+});
+
+// Custom marker icon for current location
+const currentLocationIcon = new L.Icon({
+  iconUrl: require("leaflet/dist/images/marker-icon.png"),
+  iconRetinaUrl: require("leaflet/dist/images/marker-icon-2x.png"),
+  shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
+  iconSize: [25, 41],
+  iconAnchor: [12, 41],
+  popupAnchor: [1, -34],
+  shadowSize: [41, 41],
+  className: "current-location-marker"
+});
+
+// Component to handle map location updates
+function LocationMarker({ position, setPosition }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (position) {
+      map.setView(position, map.getZoom());
+    }
+  }, [position, map]);
+
+  return position ? (
+    <Marker position={position} icon={currentLocationIcon}>
+      <Popup>You are here</Popup>
+    </Marker>
+  ) : null;
+}
 
 function LocationAccess({ onLocationSet }) {
   const [collegeName, setCollegeName] = useState("");
-  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [currentLocation, setCurrentLocation] = useState(null);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
-  // List of popular colleges
+  // List of colleges without predefined locations
   const colleges = [
-    { value: "kiet", label: "KIET Group of Institutions", location: "28.6448,77.4931" },
-    { value: "pes", label: "PES University", location: "12.9716,77.5946" },
-    { value: "rvce", label: "RV College of Engineering", location: "12.9716,77.5946" },
-    { value: "msrit", label: "MS Ramaiah Institute of Technology", location: "12.9716,77.5946" },
-    { value: "bmsce", label: "BMS College of Engineering", location: "12.9716,77.5946" },
-    { value: "srm", label: "SRM University", location: "12.9716,77.5946" },
-    { value: "christ", label: "Christ University", location: "12.9716,77.5946" },
-    { value: "manipal", label: "Manipal Institute of Technology", location: "12.9716,77.5946" },
-    { value: "vit", label: "VIT University", location: "12.9716,77.5946" },
+    { value: "kiet", label: "KIET Group of Institutions" },
+    { value: "pes", label: "PES University" },
+    { value: "rvce", label: "RV College of Engineering" },
+    { value: "msrit", label: "MS Ramaiah Institute of Technology" },
+    { value: "bmsce", label: "BMS College of Engineering" },
+    { value: "srm", label: "SRM University" },
+    { value: "christ", label: "Christ University" },
+    { value: "manipal", label: "Manipal Institute of Technology" },
+    { value: "vit", label: "VIT University" },
   ];
+
+  const getCurrentLocation = () => {
+    setIsLoadingLocation(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          setCurrentLocation([latitude, longitude]);
+          setIsLoadingLocation(false);
+          message.success("Location found!");
+        },
+        (error) => {
+          console.error("Error getting location:", error);
+          message.error("Could not get your location. Please try again.");
+          setIsLoadingLocation(false);
+        }
+      );
+    } else {
+      message.error("Geolocation is not supported by your browser");
+      setIsLoadingLocation(false);
+    }
+  };
 
   const handleLocationSelect = (value) => {
     setCollegeName(value);
-    const selectedCollege = colleges.find(c => c.value === value);
-    if (selectedCollege) {
-      setSelectedLocation(selectedCollege.location);
-    }
   };
 
   const handleSaveLocation = () => {
@@ -32,12 +91,12 @@ function LocationAccess({ onLocationSet }) {
       message.error("Please select your college");
       return;
     }
-    if (!selectedLocation) {
-      message.error("Please select a location");
+    if (!currentLocation) {
+      message.error("Please get your current location first");
       return;
     }
 
-    localStorage.setItem("userLocation", selectedLocation);
+    localStorage.setItem("userLocation", currentLocation.join(","));
     localStorage.setItem("userCollege", collegeName);
     message.success("Location saved successfully!");
     onLocationSet();
@@ -67,17 +126,29 @@ function LocationAccess({ onLocationSet }) {
               />
             </div>
 
-            <div className="h-[400px] rounded-lg overflow-hidden border">
-              {selectedLocation && (
-                <iframe
-                  width="100%"
-                  height="100%"
-                  frameBorder="0"
-                  style={{ border: 0 }}
-                  src={`https://www.google.com/maps/embed/v1/place?key=AIzaSyBFw0Qbyq9zTFTd-tUY6dZWTgaQzuU17R8&q=${selectedLocation}&zoom=15`}
-                  allowFullScreen
-                />
+            <div className="h-[400px] rounded-lg overflow-hidden border relative">
+              {currentLocation && (
+                <MapContainer
+                  center={currentLocation}
+                  zoom={15}
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  />
+                  <LocationMarker position={currentLocation} setPosition={setCurrentLocation} />
+                </MapContainer>
               )}
+              <Button
+                type="primary"
+                icon={<AimOutlined />}
+                onClick={getCurrentLocation}
+                loading={isLoadingLocation}
+                className="absolute bottom-4 right-4 z-[1000]"
+              >
+                My Location
+              </Button>
             </div>
 
             <div className="flex justify-center">
@@ -92,8 +163,7 @@ function LocationAccess({ onLocationSet }) {
             </div>
 
             <p className="text-sm text-gray-500 text-center">
-              Select your college from the dropdown above. The map will show the
-              location of your college.
+              Select your college from the dropdown above and click the location button to set your current location.
             </p>
           </div>
         </div>
