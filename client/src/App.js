@@ -7,6 +7,7 @@ import Home from "./pages/Home";
 //import {App} from "antd";
 import Login from "./pages/Login";
 import ProductInfo from "./pages/ProductInfo";
+import ProductDetails from "./pages/ProductDetails";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
 import { ConfigProvider } from "antd";
@@ -20,7 +21,8 @@ function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<ProtectedPage><Home /></ProtectedPage>}/>
-          <Route path="/product/:id" element={<ProtectedPage><ProductInfo /></ProtectedPage>}/>
+          <Route path="/pg/:id" element={<ProductInfo />}/>
+          <Route path="/product/:id" element={<ProtectedPage><ProductDetails /></ProtectedPage>}/>
           <Route path="/profile" element={<ProtectedPage><Profile /></ProtectedPage>}/>
           <Route path="/admin" element={<ProtectedPage><Admin /></ProtectedPage>}/>
           <Route path="/login" element={<Login />} />
