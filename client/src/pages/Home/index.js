@@ -105,7 +105,7 @@ function Home() {
       distance: "3.1 km",
       rating: 4.7,
       amenities: ["WiFi", "Laundry", "Food", "TV Room"],
-      images: ["https://images.unsplash.com/photo-1560449017-3e7fa6980f82?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
+      images: ["https://images.unsplash.com/photo-1560185007-5f0bb1866cab?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
       description: "Premium PG with spacious rooms and study area"
     },
     {
@@ -127,7 +127,7 @@ function Home() {
       distance: "4.2 km",
       rating: 4.9,
       amenities: ["WiFi", "Laundry", "Food", "Gym", "TV Room"],
-      images: ["https://images.unsplash.com/photo-1560449017-3e7fa6980f82?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
+      images: ["https://images.unsplash.com/photo-1560185127-6ed189bf02f4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
       description: "Luxury PG with premium amenities and services"
     },
     {
