@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Tabs, Input, Avatar, List, Tag, Tooltip } from "antd";
 import { UserOutlined, LikeOutlined, MessageOutlined, ShareAltOutlined } from '@ant-design/icons';
@@ -11,8 +11,12 @@ function Home() {
     status: "approved",
     category: [],
     age: [],
+    priceRange: [0, 10000],
+    amenities: [],
+    rating: 0
   });
   const [newMessage, setNewMessage] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
   const navigate = useNavigate();
 
   // Mock products data with real images
@@ -207,6 +211,65 @@ function Home() {
     }
   ];
 
+  // Filter products based on selected filters and search query
+  const filteredProducts = useMemo(() => {
+    return mockProducts.filter(product => {
+      // Search query filter
+      const matchesSearch = searchQuery === "" || 
+        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        product.category.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Category filter
+      const matchesCategory = filters.category.length === 0 || 
+        filters.category.includes(product.category);
+
+      // Age filter
+      const matchesAge = filters.age.length === 0 || 
+        filters.age.includes(product.age.toString());
+
+      // Price range filter
+      const matchesPrice = product.price >= filters.priceRange[0] && 
+        product.price <= filters.priceRange[1];
+
+      return matchesSearch && matchesCategory && matchesAge && matchesPrice;
+    });
+  }, [mockProducts, filters, searchQuery]);
+
+  // Filter PGs based on selected filters and search query
+  const filteredPGs = useMemo(() => {
+    return mockPGs.filter(pg => {
+      // Search query filter
+      const matchesSearch = searchQuery === "" || 
+        pg.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pg.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        pg.location.toLowerCase().includes(searchQuery.toLowerCase());
+
+      // Amenities filter
+      const matchesAmenities = filters.amenities.length === 0 || 
+        filters.amenities.every(amenity => pg.amenities.includes(amenity));
+
+      // Price range filter
+      const matchesPrice = pg.price >= filters.priceRange[0] && 
+        pg.price <= filters.priceRange[1];
+
+      // Rating filter
+      const matchesRating = pg.rating >= filters.rating;
+
+      return matchesSearch && matchesAmenities && matchesPrice && matchesRating;
+    });
+  }, [mockPGs, filters, searchQuery]);
+
+  // Filter community messages based on search query
+  const filteredMessages = useMemo(() => {
+    return mockMessages.filter(message => {
+      return searchQuery === "" || 
+        message.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        message.tags.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+    });
+  }, [mockMessages, searchQuery]);
+
   const handlePostMessage = () => {
     if (newMessage.trim() === "") return;
     
@@ -221,7 +284,7 @@ function Home() {
       label: 'Products',
       children: (
         <div className="grid gap-6 grid-cols-3">
-          {mockProducts.map((product) => {
+          {filteredProducts.map((product) => {
             return (
               <div
                 className="modern-card card-hover group cursor-pointer"
@@ -258,6 +321,11 @@ function Home() {
               </div>
             );
           })}
+          {filteredProducts.length === 0 && (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500">No products found matching your filters</p>
+            </div>
+          )}
         </div>
       ),
     },
@@ -266,7 +334,7 @@ function Home() {
       label: 'PGs Near Me',
       children: (
         <div className="grid gap-6 grid-cols-3">
-          {mockPGs.map((pg) => {
+          {filteredPGs.map((pg) => {
             return (
               <div
                 className="modern-card card-hover group cursor-pointer"
@@ -315,6 +383,11 @@ function Home() {
               </div>
             );
           })}
+          {filteredPGs.length === 0 && (
+            <div className="col-span-3 text-center py-8">
+              <p className="text-gray-500">No PGs found matching your filters</p>
+            </div>
+          )}
         </div>
       ),
     },
@@ -352,7 +425,7 @@ function Home() {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Community Messages</h2>
             <List
               itemLayout="vertical"
-              dataSource={mockMessages}
+              dataSource={filteredMessages}
               renderItem={(item) => (
                 <List.Item
                   key={item.id}
@@ -392,6 +465,11 @@ function Home() {
                 </List.Item>
               )}
             />
+            {filteredMessages.length === 0 && (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No messages found matching your search</p>
+              </div>
+            )}
           </div>
         </div>
       ),
@@ -421,6 +499,8 @@ function Home() {
               type="text"
               placeholder="Search Products, PGs, or community messages..."
               className="search-input w-full"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
