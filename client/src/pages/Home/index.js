@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, Tabs, Input, Avatar, List, Tag, Tooltip, Modal } from "antd";
 import { UserOutlined, LikeOutlined, MessageOutlined, ShareAltOutlined, DeleteOutlined } from '@ant-design/icons';
 import Divider from "../../components/Divider";
 import Filters from "./Filters";
+import LocationAccess from "../../components/LocationAccess";
 
 // Mock products data with real images
 const mockProducts = [
@@ -216,7 +217,32 @@ function Home() {
   });
   const [commentText, setCommentText] = useState("");
   const [expandedPostId, setExpandedPostId] = useState(null);
+  const [activeTab, setActiveTab] = useState("products");
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedAgeRange, setSelectedAgeRange] = useState([]);
+  const [priceRange, setPriceRange] = useState([0, 1000]);
+  const [selectedAmenities, setSelectedAmenities] = useState([]);
+  const [rating, setRating] = useState(0);
+  const [hasLocationAccess, setHasLocationAccess] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if location access is granted
+    const checkLocationAccess = () => {
+      const savedLocation = localStorage.getItem("userLocation");
+      const savedCollege = localStorage.getItem("userCollege");
+      
+      if (savedLocation && savedCollege) {
+        setHasLocationAccess(true);
+      }
+    };
+
+    checkLocationAccess();
+  }, []);
+
+  const handleLocationSet = () => {
+    setHasLocationAccess(true);
+  };
 
   // Filter products based on selected filters and search query
   const filteredProducts = useMemo(() => {
@@ -620,6 +646,10 @@ function Home() {
       ),
     },
   ];
+
+  if (!hasLocationAccess) {
+    return <LocationAccess onLocationSet={handleLocationSet} />;
+  }
 
   return (
     <div className="flex gap-6 max-w-7xl mx-auto">
