@@ -423,6 +423,20 @@ function ProductInfo() {
 
   const handleOpenUPI = () => {
     try {
+      // Create a more compatible UPI URL
+      const upiParams = {
+        pa: '7404313376@ybl', // Payee address
+        pn: 'Restore', // Payee name
+        am: product.price.toString(), // Amount
+        cu: 'INR', // Currency
+        tn: `Payment for ${product.name}`, // Transaction note
+      };
+
+      // Convert params to URL string with proper encoding
+      const upiUrl = `upi://pay?${Object.entries(upiParams)
+        .map(([key, value]) => `${key}=${encodeURIComponent(value)}`)
+        .join('&')}`;
+
       // Try to open in UPI app
       window.location.href = upiUrl;
       
@@ -435,8 +449,9 @@ function ProductInfo() {
               <p>If UPI app didn't open automatically:</p>
               <ol className="list-decimal pl-4 mt-1">
                 <li>Copy this UPI ID: 7404313376@ybl</li>
-                <li>Open your UPI app manually</li>
-                <li>Enter the amount: ₹{isPG ? product.price : product.price}</li>
+                <li>Open your UPI app manually (Google Pay, PhonePe, Paytm, etc.)</li>
+                <li>Enter the amount: ₹{product.price}</li>
+                <li>Add a note: Payment for {product.name}</li>
               </ol>
             </div>
           ),
@@ -512,7 +527,7 @@ function ProductInfo() {
     }
   `;
 
-  // Add the missing renderPaymentModal function
+  // Update the payment modal to include better instructions
   const renderPaymentModal = () => (
     <Modal
       title="Scan QR Code to Pay with UPI"
@@ -534,7 +549,7 @@ function ProductInfo() {
     >
       <div className="flex flex-col items-center space-y-4">
         <img src={qrCode} alt="UPI Payment QR Code" className="w-64 h-64" />
-        <p className="text-gray-600 text-lg font-semibold">Amount: ₹{isPG ? product.price : product.price}</p>
+        <p className="text-gray-600 text-lg font-semibold">Amount: ₹{product.price}</p>
         <p className="text-sm text-gray-500">Scan this QR code with any UPI app to pay</p>
         <div className="flex flex-col items-center space-y-2">
           <Button 
@@ -544,7 +559,10 @@ function ProductInfo() {
           >
             Open in UPI App
           </Button>
-          <p className="text-xs text-gray-500">UPI ID: 7404313376@ybl</p>
+          <div className="text-center">
+            <p className="text-xs text-gray-500">UPI ID: 7404313376@ybl</p>
+            <p className="text-xs text-gray-500 mt-1">Supported Apps: Google Pay, PhonePe, Paytm, etc.</p>
+          </div>
         </div>
       </div>
     </Modal>
