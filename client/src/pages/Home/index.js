@@ -5,6 +5,10 @@ import { UserOutlined, LikeOutlined, MessageOutlined, ShareAltOutlined, DeleteOu
 import Divider from "../../components/Divider";
 import Filters from "./Filters";
 import LocationAccess from "../../components/LocationAccess";
+import { useDispatch } from "react-redux";
+import { SetLoader } from "../../redux/loadersSlice";
+import { message } from "antd";
+import ProductCard from "../../components/ProductCard";
 
 // Mock products data with real images
 const mockProducts = [
@@ -15,7 +19,16 @@ const mockProducts = [
     age: 2,
     category: "electronics",
     images: ["https://images.unsplash.com/photo-1593642632823-8f785ba67e45?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "High-performance gaming laptop with RTX graphics"
+    description: "High-performance gaming laptop with RTX graphics",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   },
   {
     _id: "2",
@@ -24,7 +37,16 @@ const mockProducts = [
     age: 1,
     category: "furniture",
     images: ["https://images.unsplash.com/photo-1580480055273-228ff5388ef8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "Comfortable office chair with lumbar support"
+    description: "Comfortable office chair with lumbar support",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   },
   {
     _id: "3",
@@ -33,7 +55,16 @@ const mockProducts = [
     age: 3,
     category: "fashion",
     images: ["https://images.unsplash.com/photo-1523275335684-37898b6baf30?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "Elegant designer watch with leather strap"
+    description: "Elegant designer watch with leather strap",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   },
   {
     _id: "4",
@@ -42,7 +73,16 @@ const mockProducts = [
     age: 1,
     category: "electronics",
     images: ["https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "Premium noise-cancelling wireless headphones"
+    description: "Premium noise-cancelling wireless headphones",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   },
   {
     _id: "5",
@@ -51,7 +91,16 @@ const mockProducts = [
     age: 2,
     category: "furniture",
     images: ["https://images.unsplash.com/photo-1555041469-a586c61ea9bc?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "Contemporary 3-seater sofa with premium fabric"
+    description: "Contemporary 3-seater sofa with premium fabric",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   },
   {
     _id: "6",
@@ -60,7 +109,16 @@ const mockProducts = [
     age: 1,
     category: "electronics",
     images: ["https://images.unsplash.com/photo-1579586337278-3befd40fd17a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80"],
-    description: "Feature-rich smartwatch with health tracking"
+    description: "Feature-rich smartwatch with health tracking",
+    status: "Available",
+    billAvailable: true,
+    warrantyAvailable: true,
+    accessoriesAvailable: true,
+    boxAvailable: true,
+    seller: {
+      name: "Restore Store",
+      email: "store@restore.com"
+    }
   }
 ];
 
@@ -224,9 +282,54 @@ function Home() {
   const [selectedAmenities, setSelectedAmenities] = useState([]);
   const [rating, setRating] = useState(0);
   const [hasLocationAccess, setHasLocationAccess] = useState(false);
+  const [products, setProducts] = useState([]);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  const getData = async () => {
+    try {
+      dispatch(SetLoader(true));
+      // Get products from localStorage
+      const storedProducts = localStorage.getItem('products');
+      let allProducts = [...mockProducts]; // Start with mock products
+      
+      if (storedProducts) {
+        try {
+          // Filter only approved products from localStorage
+          const localStorageProducts = JSON.parse(storedProducts);
+          console.log("Home: Raw localStorage products:", localStorageProducts);
+          
+          // Add IDs to products if they don't have them
+          const productsWithIds = localStorageProducts.map(p => {
+            const newId = p._id || p.id || `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            console.log("Home: Adding ID to product:", p.name, "with ID:", newId);
+            return {
+              ...p,
+              _id: newId,
+              id: newId
+            };
+          });
+          
+          // Combine mock products with approved localStorage products
+          allProducts = [...mockProducts, ...productsWithIds];
+          console.log("Home: All products with IDs:", allProducts);
+        } catch (error) {
+          console.error("Error parsing localStorage products:", error);
+          message.error("Error loading products");
+        }
+      }
+      
+      setProducts(allProducts);
+      dispatch(SetLoader(false));
+    } catch (error) {
+      dispatch(SetLoader(false));
+      message.error(error.message);
+    }
+  };
 
   useEffect(() => {
+    getData();
+
     // Check if location access is granted
     const checkLocationAccess = () => {
       const savedLocation = localStorage.getItem("userLocation");
@@ -246,7 +349,7 @@ function Home() {
 
   // Filter products based on selected filters and search query
   const filteredProducts = useMemo(() => {
-    return mockProducts.filter(product => {
+    return products.filter(product => {
       // Search query filter
       const matchesSearch = searchQuery === "" || 
         product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -267,7 +370,7 @@ function Home() {
 
       return matchesSearch && matchesCategory && matchesAge && matchesPrice;
     });
-  }, [mockProducts, filters, searchQuery]);
+  }, [products, filters, searchQuery]);
 
   // Filter PGs based on selected filters and search query
   const filteredPGs = useMemo(() => {
@@ -414,39 +517,10 @@ function Home() {
         <div className="grid gap-6 grid-cols-3">
           {filteredProducts.map((product) => {
             return (
-              <div
-                className="modern-card card-hover group cursor-pointer"
-                key={product._id}
-                onClick={() => navigate(`/product/${product._id}`)}
-              >
-                <div className="product-image-container">
-                  <img
-                    src={product.images[0]}
-                    alt={product.name}
-                    className="w-full h-64 object-cover"
-                  />
-                  <div className="category-badge">
-                    {product.category}
-                  </div>
-                </div>
-                <div className="p-5 flex flex-col gap-3">
-                  <h1 className="text-lg font-semibold text-gray-800 group-hover:text-primary transition-colors">
-                    {product.name}
-                  </h1>
-                  <p className="text-sm text-gray-600">
-                    {product.age} {product.age === 1 ? " year" : " years"} old
-                  </p>
-                  <Divider />
-                  <div className="flex justify-between items-center">
-                    <span className="price-tag">
-                      ₹ {product.price}
-                    </span>
-                    <Button type="primary" size="small" className="primary-button">
-                      View Details
-                    </Button>
-                  </div>
-                </div>
-              </div>
+              <ProductCard 
+                key={product._id || product.id} 
+                product={product}
+              />
             );
           })}
           {filteredProducts.length === 0 && (
@@ -467,7 +541,14 @@ function Home() {
               <div
                 className="modern-card card-hover group cursor-pointer"
                 key={pg._id}
-                onClick={() => navigate(`/pg/${pg._id}`)}
+                onClick={() => {
+                  // Store PG data in localStorage before navigation
+                  localStorage.setItem('currentProduct', JSON.stringify({
+                    ...pg,
+                    type: 'pg' // Mark as PG type
+                  }));
+                  navigate(`/pg/${pg._id}`);
+                }}
               >
                 <div className="product-image-container">
                   <img
@@ -503,7 +584,20 @@ function Home() {
                         Rating: {pg.rating}/5
                       </span>
                     </div>
-                    <Button type="primary" size="small" className="primary-button">
+                    <Button 
+                      type="primary" 
+                      size="small" 
+                      className="primary-button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        // Store PG data in localStorage before navigation
+                        localStorage.setItem('currentProduct', JSON.stringify({
+                          ...pg,
+                          type: 'pg' // Mark as PG type
+                        }));
+                        navigate(`/pg/${pg._id}`);
+                      }}
+                    >
                       View Details
                     </Button>
                   </div>

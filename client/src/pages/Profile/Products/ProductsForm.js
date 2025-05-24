@@ -1,10 +1,9 @@
-import { Modal, Tabs, Form, Input, Row, Col, message } from "antd";
+import { Modal, Form, Input, Row, Col, message, Upload } from "antd";
+import { PlusOutlined } from "@ant-design/icons";
 import TextArea from "antd/es/input/TextArea";
-import { useDispatch, useSelector } from "react-redux";
-import { AddProduct, EditProduct } from "../../../apicalls/products";
+import { useDispatch } from "react-redux";
 import { SetLoader } from "../../../redux/loadersSlice";
-import React, { useEffect } from "react";
-import Images from "./Images";
+import React, { useEffect, useState } from "react";
 
 const additionalThings = [
   {
@@ -32,155 +31,210 @@ const rules = [
   },
 ];
 
+// Default image URLs for products
+const defaultImages = {
+  electronics: "https://images.unsplash.com/photo-1593642632823-8f785ba67e45",
+  furniture: "https://images.unsplash.com/photo-1580480055273-228ff5388ef8",
+  fashion: "https://images.unsplash.com/photo-1523275335684-37898b6baf30",
+  other: "https://images.unsplash.com/photo-1505740420928-5e560c06d30e"
+};
+
 function ProductsForm({
   showProductForm,
   setShowProductForm,
   selectedProduct,
   getData,
 }) {
-  const [selectedTab = "1", setSelectedTab] = React.useState("1");
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.users);
+  const formRef = React.useRef(null);
+  const [images, setImages] = useState([]);
+
+  useEffect(() => {
+    if (selectedProduct) {
+      formRef.current.setFieldsValue(selectedProduct);
+      if (selectedProduct.images && selectedProduct.images.length > 0) {
+        setImages(selectedProduct.images.map((url, index) => ({
+          uid: `-${index}`,
+          name: `image-${index}`,
+          status: 'done',
+          url: url
+        })));
+      }
+    }
+  }, [selectedProduct]);
+
+  const getRandomUnsplashImage = (query) => {
+    // Clean the query string and use it for the image
+    const cleanQuery = query.toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Use a random seed to get different images for the same query
+    const randomSeed = Math.floor(Math.random() * 1000);
+    return `https://source.unsplash.com/random/800x600/?${cleanQuery}&sig=${randomSeed}`;
+  };
+
   const onFinish = async (values) => {
     try {
       dispatch(SetLoader(true));
-      let response = null;
+      
+      // Get existing products
+      const storedProducts = localStorage.getItem('products');
+      let products = storedProducts ? JSON.parse(storedProducts) : [];
+      
+      // Get image URLs from the images state or generate new one
+      const imageUrls = images.length > 0 
+        ? images.map(img => img.url)
+        : [getRandomUnsplashImage(values.name)];
+      
       if (selectedProduct) {
-        response = await EditProduct(selectedProduct._id, values);
+        // Edit existing product
+        products = products.map(p => 
+          p._id === selectedProduct._id 
+            ? { 
+                ...p, 
+                ...values, 
+                images: imageUrls,
+                updatedAt: new Date().toISOString() 
+              }
+            : p
+        );
       } else {
-        values.seller = user._id;
-        values.status = "pending";
-        response = await AddProduct(values);
+        // Add new product
+        const newProduct = {
+          ...values,
+          _id: Date.now().toString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          status: "pending",
+          images: imageUrls
+        };
+        products.push(newProduct);
       }
+      
+      // Save to localStorage
+      localStorage.setItem('products', JSON.stringify(products));
+      
       dispatch(SetLoader(false));
-      if (response.success) {
-        message.success(response.message);
-        getData();
-        setShowProductForm(false);
-      } else {
-        message.error(response.message);
-      }
+      message.success(selectedProduct ? "Product updated successfully" : "Product added successfully");
+      getData();
+      setShowProductForm(false);
     } catch (error) {
       dispatch(SetLoader(false));
       message.error(error.message);
     }
   };
-  const formRef = React.useRef(null);
 
-  useEffect(() => {
-    if (selectedProduct) {
-      formRef.current.setFieldsValue(selectedProduct);
+  const handleImageUpload = (info) => {
+    if (info.file.status === 'done') {
+      // Get the product name from the form
+      const productName = formRef.current.getFieldValue('name');
+      // Generate a random image based on the product name
+      const randomImage = getRandomUnsplashImage(productName);
+      
+      setImages([{
+        uid: info.file.uid,
+        name: info.file.name,
+        status: 'done',
+        url: randomImage
+      }]);
     }
-  }, [selectedProduct]);
+  };
+
+  const handleImageRemove = () => {
+    setImages([]);
+  };
+
   return (
     <Modal
-      title=""
+      title={selectedProduct ? "Edit Product" : "Add Product"}
       open={showProductForm}
       onCancel={() => setShowProductForm(false)}
-      centered
+      footer={null}
       width={1000}
-      okText="Save"
-      onOk={() => {
-        formRef.current.submit();
-      }}
-      {...(selectedTab === "2" && { footer: false })}
     >
-      <div>
-        <h1 className="text-primary text-2xl text-center font-semibold uppercase">
-          {selectedProduct ? "Edit Product" : "Add Product"}
-        </h1>
-        <Tabs
-          defaultActiveKey="1"
-          activeKey={selectedTab}
-          onChange={(key) => setSelectedTab(key)}
-        >
-          <Tabs.TabPane tab="General" key="1">
-            <Form layout="vertical" ref={formRef} onFinish={onFinish}>
-              <Form.Item label="Name" name="name" rules={rules}>
-                <Input type="text" />
-              </Form.Item>
-              <Form.Item label="Description" name="description" rules={rules}>
-                <TextArea type="text" />
-              </Form.Item>
+      <Form
+        layout="vertical"
+        onFinish={onFinish}
+        ref={formRef}
+        initialValues={{
+          billAvailable: false,
+          warrantyAvailable: false,
+          accessoriesAvailable: false,
+          boxAvailable: false,
+        }}
+      >
+        <Form.Item label="Name" name="name" rules={rules}>
+          <Input placeholder="Name" />
+        </Form.Item>
 
-              <Row gutter={[16, 16]}>
-                <Col span={8}>
-                  <Form.Item label="Price" name="price" rules={rules}>
-                    <Input type="number" />
-                  </Form.Item>
-                </Col>
+        <Form.Item label="Description" name="description" rules={rules}>
+          <TextArea placeholder="Description" />
+        </Form.Item>
 
-                <Col span={8}>
-                  <Form.Item label="Category" name="category" rules={rules}>
-                    <select>
-                      <option value="">Select</option>
-                      <option value="electronics">Electronics</option>
-                      <option value="fashion">Fashion</option>
-                      <option value="furniture">Furniture</option>
-                      <option value="sports">Sports</option>
-                    </select>
-                  </Form.Item>
-                </Col>
+        <Row gutter={[16, 16]}>
+          <Col span={8}>
+            <Form.Item label="Price" name="price" rules={rules}>
+              <Input type="number" placeholder="Price" />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Category" name="category" rules={rules}>
+              <Input placeholder="Category" />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="Age" name="age" rules={rules}>
+              <Input type="number" placeholder="Age" />
+            </Form.Item>
+          </Col>
+        </Row>
 
-                <Col span={8}>
-                  <Form.Item label="Age" name="age" rules={rules}>
-                    <Input type="number" />
-                  </Form.Item>
-                </Col>
-              </Row>
-
-              <div className="flex gap-10">
-                {additionalThings.map((item) => {
-                  return (
-                    <Form.Item
-                      label={item.label}
-                      name={item.name}
-                      valuePropName="checked"
-                    >
-                      <Input
-                        type="checkbox"
-                        value={item.name}
-                        onChange={(e) => {
-                          formRef.current.setFieldsValue({
-                            [item.name]: e.target.checked,
-                          });
-                        }}
-                        checked={formRef.current?.getFieldValue(item.name)}
-                      />
-                    </Form.Item>
-                  );
-                })}
+        <Form.Item label="Images" name="images">
+          <Upload
+            listType="picture-card"
+            fileList={images}
+            beforeUpload={() => false}
+            onChange={handleImageUpload}
+            onRemove={handleImageRemove}
+            maxCount={1}
+          >
+            {images.length >= 1 ? null : (
+              <div>
+                <PlusOutlined />
+                <div style={{ marginTop: 8 }}>Upload</div>
               </div>
+            )}
+          </Upload>
+        </Form.Item>
 
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {additionalThings.map((item) => {
+            return (
               <Form.Item
-                label="Show Bids on Product Page"
-                name="showBidsOnProductPage"
+                label={item.label}
+                name={item.name}
                 valuePropName="checked"
               >
-                <Input
-                  type="checkbox"
-                  onChange={(e) => {
-                    formRef.current.setFieldsValue({
-                      showBidsOnProductPage: e.target.checked,
-                    });
-                  }}
-                  checked={formRef.current?.getFieldValue(
-                    "showBidsOnProductPage"
-                  )}
-                  style={{ width: 50  , marginLeft:20}}
-                />
+                <input type="checkbox" />
               </Form.Item>
-            </Form>
-          </Tabs.TabPane>
-          <Tabs.TabPane tab="Images" key="2" disabled={!selectedProduct}>
-            <Images
-              selectedProduct={selectedProduct}
-              getData={getData}
-              setShowProductForm={setShowProductForm}
-            />
-          </Tabs.TabPane>
-        </Tabs>
-      </div>
+            );
+          })}
+        </div>
+
+        <div className="flex justify-end gap-4">
+          <button
+            type="button"
+            className="px-4 py-2 border border-gray-300 rounded-md"
+            onClick={() => setShowProductForm(false)}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-primary text-white rounded-md"
+          >
+            {selectedProduct ? "Update" : "Add"}
+          </button>
+        </div>
+      </Form>
     </Modal>
   );
 }

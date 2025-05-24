@@ -1,23 +1,22 @@
 import { Button, message, Table } from "antd";
 import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
+import { useDispatch } from "react-redux";
 import moment from "moment";
-import { GetProducts, UpdateProductStatus } from "../../apicalls/products";
 import { SetLoader } from "../../redux/loadersSlice";
 
 function Products() {
   const [products, setProducts] = React.useState([]);
-
   const dispatch = useDispatch();
 
   const getData = async () => {
     try {
       dispatch(SetLoader(true));
-      const response = await GetProducts(null);
-      dispatch(SetLoader(false));
-      if (response.success) {
-        setProducts(response.data);
+      // Get products from localStorage
+      const storedProducts = localStorage.getItem('products');
+      if (storedProducts) {
+        setProducts(JSON.parse(storedProducts));
       }
+      dispatch(SetLoader(false));
     } catch (error) {
       dispatch(SetLoader(false));
       message.error(error.message);
@@ -27,14 +26,22 @@ function Products() {
   const onStatusUpdate = async (id, status) => {
     try {
       dispatch(SetLoader(true));
-      const response = await UpdateProductStatus(id, status);
-      dispatch(SetLoader(false));
-      if (response.success) {
-        message.success(response.message);
-        getData();
-      } else {
-        throw new Error(response.message);
+      
+      // Update product status in localStorage
+      const storedProducts = localStorage.getItem('products');
+      if (storedProducts) {
+        let products = JSON.parse(storedProducts);
+        products = products.map(p => 
+          p._id === id 
+            ? { ...p, status, updatedAt: new Date().toISOString() }
+            : p
+        );
+        localStorage.setItem('products', JSON.stringify(products));
+        setProducts(products);
       }
+      
+      dispatch(SetLoader(false));
+      message.success(`Product ${status} successfully`);
     } catch (error) {
       dispatch(SetLoader(false));
       message.error(error.message);
@@ -56,17 +63,9 @@ function Products() {
       },
     },
     {
-      title: "Product",
+      title: "Name",
       dataIndex: "name",
     },
-    {
-      title: "Seller",
-      dataIndex: "name",
-      render: (text, record) => {
-        return record.seller.name;
-      },
-    },
-
     {
       title: "Price",
       dataIndex: "price",
@@ -83,8 +82,18 @@ function Products() {
       title: "Status",
       dataIndex: "status",
       render: (text, record) => {
-        return record.status.toUpperCase();
-      },
+        const statusColors = {
+          pending: "text-yellow-600",
+          approved: "text-green-600",
+          rejected: "text-red-600",
+          blocked: "text-gray-600"
+        };
+        return (
+          <span className={`font-semibold ${statusColors[record.status]}`}>
+            {record.status.toUpperCase()}
+          </span>
+        );
+      }
     },
     {
       title: "Added On",
@@ -100,24 +109,24 @@ function Products() {
         return (
           <div className="flex gap-3">
             {status === "pending" && (
-              <span
-                className="underline cursor-pointer"
-                onClick={() => onStatusUpdate(_id, "approved")}
-              >
-                Approve
-              </span>
-            )}
-            {status === "pending" && (
-              <span
-                className="underline cursor-pointer"
-                onClick={() => onStatusUpdate(_id, "rejected")}
-              >
-                Reject
-              </span>
+              <>
+                <span
+                  className="text-green-600 underline cursor-pointer"
+                  onClick={() => onStatusUpdate(_id, "approved")}
+                >
+                  Approve
+                </span>
+                <span
+                  className="text-red-600 underline cursor-pointer"
+                  onClick={() => onStatusUpdate(_id, "rejected")}
+                >
+                  Reject
+                </span>
+              </>
             )}
             {status === "approved" && (
               <span
-                className="underline cursor-pointer"
+                className="text-red-600 underline cursor-pointer"
                 onClick={() => onStatusUpdate(_id, "blocked")}
               >
                 Block
@@ -125,7 +134,7 @@ function Products() {
             )}
             {status === "blocked" && (
               <span
-                className="underline cursor-pointer"
+                className="text-green-600 underline cursor-pointer"
                 onClick={() => onStatusUpdate(_id, "approved")}
               >
                 Unblock
@@ -140,9 +149,18 @@ function Products() {
   useEffect(() => {
     getData();
   }, []);
+
   return (
     <div>
-      <Table columns={columns} dataSource={products} />
+      <div className="mb-4">
+        <h2 className="text-xl font-semibold text-gray-700">Product Management</h2>
+        <p className="text-gray-500">Review and manage product listings</p>
+      </div>
+      <Table 
+        columns={columns} 
+        dataSource={products}
+        rowKey="_id"
+      />
     </div>
   );
 }

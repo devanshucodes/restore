@@ -1,47 +1,39 @@
 import { Button, message, Table } from "antd";
-import React, { useEffect } from "react";
-import { useDispatch, useSelector } from "react-redux";
-import moment from "moment";
-import { DeleteProduct, GetProducts } from "../../../apicalls/products";
+import React, { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
 import { SetLoader } from "../../../redux/loadersSlice";
 import ProductsForm from "./ProductsForm";
 import Bids from "./Bids";
 
 function Products() {
-  const [showBids, setShowBids] = React.useState(false);
-  const [selectedProduct, setSelectedProduct] = React.useState(null);
-  const [products, setProducts] = React.useState([]);
-  const [showProductForm, setShowProductForm] = React.useState(false);
-  const { user } = useSelector((state) => state.users);
+  const [showBids, setShowBids] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [showProductForm, setShowProductForm] = useState(false);
   const dispatch = useDispatch();
 
-  const getData = async () => {
+  const getData = () => {
     try {
       dispatch(SetLoader(true));
-      const response = await GetProducts({
-        seller: user._id,
-      });
-      dispatch(SetLoader(false));
-      if (response.success) {
-        setProducts(response.data);
+      const storedProducts = localStorage.getItem('products');
+      if (storedProducts) {
+        setProducts(JSON.parse(storedProducts));
       }
+      dispatch(SetLoader(false));
     } catch (error) {
       dispatch(SetLoader(false));
       message.error(error.message);
     }
   };
 
-  const deleteProduct = async (id) => {
+  const deleteProduct = (id) => {
     try {
       dispatch(SetLoader(true));
-      const response = await DeleteProduct(id);
+      const updatedProducts = products.filter(p => p._id !== id);
+      localStorage.setItem('products', JSON.stringify(updatedProducts));
+      setProducts(updatedProducts);
       dispatch(SetLoader(false));
-      if (response.success) {
-        message.success(response.message);
-        getData();
-      } else {
-        message.error(response.message);
-      }
+      message.success('Product deleted successfully');
     } catch (error) {
       dispatch(SetLoader(false));
       message.error(error.message);
@@ -85,8 +77,7 @@ function Products() {
     {
       title: "Added On",
       dataIndex: "createdAt",
-      render: (text, record) =>
-        moment(record.createdAt).format("DD-MM-YYYY hh:mm A"),
+      render: (text, record) => new Date(record.createdAt).toLocaleString(),
     },
     {
       title: "Action",
@@ -95,19 +86,16 @@ function Products() {
         return (
           <div className="flex gap-5 items-center">
             <i
-              className="ri-delete-bin-line"
-              onClick={() => {
-                deleteProduct(record._id);
-              }}
+              className="ri-delete-bin-line cursor-pointer"
+              onClick={() => deleteProduct(record._id)}
             ></i>
             <i
-              className="ri-pencil-line"
+              className="ri-pencil-line cursor-pointer"
               onClick={() => {
                 setSelectedProduct(record);
                 setShowProductForm(true);
               }}
             ></i>
-
             <span
               className="underline cursor-pointer"
               onClick={() => {
@@ -126,6 +114,7 @@ function Products() {
   useEffect(() => {
     getData();
   }, []);
+
   return (
     <div>
       <div className="flex justify-end mb-2">
