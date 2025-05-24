@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { Button, message, Input, Modal } from "antd";
+import { Button, message as antMessage, Input, Modal } from "antd";
 import { useDispatch } from "react-redux";
 import { SetLoader } from "../../redux/loadersSlice";
 import Divider from "../../components/Divider";
-import { SendOutlined } from '@ant-design/icons';
+import { SendOutlined, CheckCircleFilled, DollarCircleFilled, ShopFilled } from '@ant-design/icons';
 
 // Mock products data
 const mockProducts = [
@@ -156,6 +156,19 @@ function ProductInfo() {
   const [chatMessages, setChatMessages] = useState([]);
   const [showBidInput, setShowBidInput] = useState(false);
   const [bidAmount, setBidAmount] = useState("");
+  const [showPayment, setShowPayment] = useState(false);
+  const [showUPIModal, setShowUPIModal] = useState(false);
+  const [userUPI, setUserUPI] = useState("");
+  const [showVerification, setShowVerification] = useState(false);
+  const [paymentLink, setPaymentLink] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [messageApi, contextHolder] = antMessage.useMessage();
+  const chatContainerRef = useRef(null);
+  const [pendingMessage, setPendingMessage] = useState(null);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [qrCode, setQrCode] = useState('');
+  const [upiUrl, setUpiUrl] = useState('');
 
   const getData = async () => {
     try {
@@ -190,29 +203,29 @@ function ProductInfo() {
           }
           
           // Regular product
-          setIsPG(false);
-          const productWithDefaults = {
-            ...productData,
-            _id: productData._id || productData.id || id,
-            name: productData.name || "Product",
-            price: productData.price || 0,
-            age: productData.age || 0,
-            category: productData.category || "other",
-            images: productData.images || [productData.image] || ["https://via.placeholder.com/600"],
-            description: productData.description || "No description available",
-            status: productData.status || "Available",
-            billAvailable: productData.billAvailable || false,
-            warrantyAvailable: productData.warrantyAvailable || false,
-            accessoriesAvailable: productData.accessoriesAvailable || false,
-            boxAvailable: productData.boxAvailable || false,
-            seller: productData.seller || {
-              name: productData.name || "Seller",
-              email: productData.email || "seller@example.com"
-            }
-          };
-          console.log("ProductInfo: Setting product with defaults:", productWithDefaults);
-          setProduct(productWithDefaults);
-          return;
+            setIsPG(false);
+            const productWithDefaults = {
+              ...productData,
+              _id: productData._id || productData.id || id,
+              name: productData.name || "Product",
+              price: productData.price || 0,
+              age: productData.age || 0,
+              category: productData.category || "other",
+              images: productData.images || [productData.image] || ["https://via.placeholder.com/600"],
+              description: productData.description || "No description available",
+              status: productData.status || "Available",
+              billAvailable: productData.billAvailable || false,
+              warrantyAvailable: productData.warrantyAvailable || false,
+              accessoriesAvailable: productData.accessoriesAvailable || false,
+              boxAvailable: productData.boxAvailable || false,
+              seller: productData.seller || {
+                name: productData.name || "Seller",
+                email: productData.email || "seller@example.com"
+              }
+            };
+            console.log("ProductInfo: Setting product with defaults:", productWithDefaults);
+            setProduct(productWithDefaults);
+            return;
         } catch (error) {
           console.error("ProductInfo: Error parsing current product:", error);
         }
@@ -232,19 +245,53 @@ function ProductInfo() {
         setProduct(foundProduct);
       } else {
         console.log("ProductInfo: Product not found");
-        message.error("Product not found");
+        antMessage.error("Product not found");
         navigate("/");
       }
     } catch (error) {
       console.error("ProductInfo: Error in getData:", error);
-      message.error(error.message);
+      antMessage.error(error.message);
     } finally {
       dispatch(SetLoader(false));
     }
   };
 
+  // Handle error messages in useEffect
+  useEffect(() => {
+    if (error) {
+      setPendingMessage(error);
+      setError(null);
+    }
+  }, [error]);
+
+  // Handle pending messages in useEffect
+  useEffect(() => {
+    if (pendingMessage) {
+      messageApi.error({
+        content: pendingMessage,
+        duration: 5,
+        key: 'message'
+      });
+      setPendingMessage(null);
+    }
+  }, [pendingMessage, messageApi]);
+
+  // Scroll chat to bottom when new messages arrive
+  useEffect(() => {
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages]);
+
+  const showMessage = (content) => {
+    setPendingMessage(content);
+  };
+
   const handleSendMessage = () => {
-    if (!message.trim()) return;
+    if (!message.trim()) {
+      showMessage("Message cannot be empty");
+      return;
+    }
 
     const newMessage = {
       id: Date.now(),
@@ -255,6 +302,24 @@ function ProductInfo() {
 
     setChatMessages([...chatMessages, newMessage]);
     setMessage("");
+  };
+
+  const handleBidSubmit = () => {
+    if (!bidAmount || isNaN(bidAmount) || Number(bidAmount) <= 0) {
+      showMessage("Please enter a valid bid amount");
+      return;
+    }
+
+    const bidMessage = {
+      id: Date.now(),
+      sender: "You",
+      content: `I would like to offer ₹${bidAmount} for this ${isPG ? 'PG' : 'product'}.`,
+      timestamp: new Date().toISOString(),
+    };
+
+    setChatMessages(prev => [...prev, bidMessage]);
+    setShowBidInput(false);
+    setBidAmount("");
   };
 
   const handleContactClick = () => {
@@ -271,23 +336,232 @@ function ProductInfo() {
     setChatMessages([initialMessage]);
   };
 
-  const handleBidSubmit = () => {
-    if (!bidAmount || isNaN(bidAmount) || Number(bidAmount) <= 0) {
-      message.error("Please enter a valid bid amount");
-      return;
-    }
+  const createPaymentQR = async () => {
+    try {
+      setLoading(true);
+      const serverUrl = 'http://localhost:4000';
+      const response = await fetch(`${serverUrl}/payment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: product.price
+        }),
+      });
 
-    const bidMessage = {
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('QR code generation failed:', errorData);
+        throw new Error(errorData.details || errorData.error || 'Failed to generate QR code');
+      }
+
+      const data = await response.json();
+      setQrCode(data.qrCode);
+      setUpiUrl(data.upiUrl);
+      setShowPaymentModal(true);
+    } catch (error) {
+      console.error('Error generating QR code:', error);
+      let errorMessage = 'Failed to generate QR code. ';
+      
+      if (error.message === 'Failed to fetch') {
+        errorMessage += 'Please make sure the server is running at http://localhost:4000';
+      } else {
+        errorMessage += error.message;
+      }
+      
+      setError(errorMessage);
+      setShowPaymentModal(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePaymentComplete = () => {
+    // Add payment confirmation message to chat with enhanced visuals
+    const paymentMessage = {
       id: Date.now(),
       sender: "You",
-      content: `I would like to offer ₹${bidAmount} for this ${isPG ? 'PG' : 'product'}.`,
+      content: (
+        <div className="bg-white rounded-lg p-4 shadow-md text-black">
+          <div className="flex items-center space-x-3 mb-2">
+            <CheckCircleFilled className="text-green-500 text-2xl animate-bounce" />
+            <span className="text-lg font-semibold text-green-600">Payment Completed</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <DollarCircleFilled className="text-blue-500" />
+              <span className="font-medium text-gray-800">Amount: ₹{isPG ? product.price : product.price}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <ShopFilled className="text-purple-500" />
+              <span className="font-medium text-gray-800">Product: {product.name}</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-200">
+            <p className="text-sm text-gray-700">Please confirm the receipt of payment.</p>
+          </div>
+        </div>
+      ),
       timestamp: new Date().toISOString(),
     };
-
-    setChatMessages(prev => [...prev, bidMessage]);
-    setShowBidInput(false);
-    setBidAmount("");
+    setChatMessages(prev => [...prev, paymentMessage]);
+    setShowPaymentModal(false);
+    
+    // Show success message with animation
+    messageApi.success({
+      content: (
+        <div className="flex items-center space-x-2">
+          <CheckCircleFilled className="text-green-500 text-xl" />
+          <span>Payment confirmation sent to chat</span>
+        </div>
+      ),
+      duration: 3,
+    });
   };
+
+  const handleOpenUPI = () => {
+    try {
+      // Try to open in UPI app
+      window.location.href = upiUrl;
+      
+      // Fallback for mobile devices
+      setTimeout(() => {
+        // If the UPI app doesn't open, show instructions
+        messageApi.info({
+          content: (
+            <div className="text-sm">
+              <p>If UPI app didn't open automatically:</p>
+              <ol className="list-decimal pl-4 mt-1">
+                <li>Copy this UPI ID: 7404313376@ybl</li>
+                <li>Open your UPI app manually</li>
+                <li>Enter the amount: ₹{isPG ? product.price : product.price}</li>
+              </ol>
+            </div>
+          ),
+          duration: 10,
+        });
+      }, 1000);
+    } catch (error) {
+      console.error('Error opening UPI app:', error);
+      messageApi.error('Failed to open UPI app. Please try scanning the QR code instead.');
+    }
+  };
+
+  // Replace the handlePayment function with createPaymentQR
+  const handlePayment = createPaymentQR;
+
+  // Update the chat message rendering to handle React elements
+  const renderChatMessage = (msg) => (
+    <div
+      key={msg.id}
+      className={`flex ${
+        msg.sender === "You" ? "justify-end" : "justify-start"
+      }`}
+    >
+      <div
+        className={`max-w-[70%] rounded-lg p-3 ${
+          msg.sender === "You"
+            ? "bg-primary text-white"
+            : msg.sender === "System"
+            ? "bg-green-100 text-green-800"
+            : "bg-gray-100 text-gray-800"
+        }`}
+      >
+        <div className="flex items-center space-x-2 mb-1">
+          <p className="text-sm font-medium">{msg.sender}</p>
+          {msg.sender === "You" && <CheckCircleFilled className="text-green-300 text-sm" />}
+        </div>
+        <div className="message-content">{msg.content}</div>
+        <p className="text-xs mt-2 opacity-70">
+          {new Date(msg.timestamp).toLocaleTimeString()}
+        </p>
+      </div>
+    </div>
+  );
+
+  // Add some CSS for animations
+  const styles = `
+    @keyframes slideIn {
+      from {
+        transform: translateY(20px);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    
+    .message-content {
+      animation: slideIn 0.3s ease-out;
+    }
+    
+    .animate-bounce {
+      animation: bounce 1s infinite;
+    }
+    
+    @keyframes bounce {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-5px);
+      }
+    }
+  `;
+
+  // Add the missing renderPaymentModal function
+  const renderPaymentModal = () => (
+    <Modal
+      title="Scan QR Code to Pay with UPI"
+      open={showPaymentModal}
+      onCancel={() => setShowPaymentModal(false)}
+      footer={[
+        <Button key="cancel" onClick={() => setShowPaymentModal(false)}>
+          Cancel
+        </Button>,
+        <Button 
+          key="done" 
+          type="primary" 
+          onClick={handlePaymentComplete}
+          className="primary-button bg-green-600 hover:bg-green-700"
+        >
+          I've Paid
+        </Button>
+      ]}
+    >
+      <div className="flex flex-col items-center space-y-4">
+        <img src={qrCode} alt="UPI Payment QR Code" className="w-64 h-64" />
+        <p className="text-gray-600 text-lg font-semibold">Amount: ₹{isPG ? product.price : product.price}</p>
+        <p className="text-sm text-gray-500">Scan this QR code with any UPI app to pay</p>
+        <div className="flex flex-col items-center space-y-2">
+          <Button 
+            type="primary"
+            className="bg-green-600 hover:bg-green-700"
+            onClick={handleOpenUPI}
+          >
+            Open in UPI App
+          </Button>
+          <p className="text-xs text-gray-500">UPI ID: 7404313376@ybl</p>
+        </div>
+      </div>
+    </Modal>
+  );
+
+  // Update the payment button in the product info section
+  const renderPaymentButton = () => (
+    <Button 
+      type="primary" 
+      size="large" 
+      className="primary-button bg-green-600 hover:bg-green-700"
+      onClick={createPaymentQR}
+      loading={loading}
+    >
+      Pay with UPI
+    </Button>
+  );
 
   useEffect(() => {
     getData();
@@ -381,6 +655,7 @@ function ProductInfo() {
                 >
                   Contact Owner
                 </Button>
+                {renderPaymentButton()}
                 <Button size="large" onClick={() => navigate("/")}>
                   Back to Home
                 </Button>
@@ -394,29 +669,11 @@ function ProductInfo() {
           <div className="glass-effect p-6 rounded-xl mt-6">
             <h2 className="text-xl font-semibold text-gray-800 mb-4">Chat with PG Owner</h2>
             <div className="flex flex-col h-[400px]">
-              <div className="flex-1 overflow-y-auto mb-4 space-y-4">
-                {chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex ${
-                      msg.sender === "You" ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[70%] rounded-lg p-3 ${
-                        msg.sender === "You"
-                          ? "bg-primary text-white"
-                          : "bg-gray-100 text-gray-800"
-                      }`}
-                    >
-                      <p className="text-sm font-medium mb-1">{msg.sender}</p>
-                      <p>{msg.content}</p>
-                      <p className="text-xs mt-1 opacity-70">
-                        {new Date(msg.timestamp).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+              <div 
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto mb-4 space-y-4"
+              >
+                {chatMessages.map(renderChatMessage)}
               </div>
               <div className="flex flex-col gap-2">
                 {showBidInput ? (
@@ -466,115 +723,251 @@ function ProductInfo() {
             </div>
           </div>
         )}
+
+        {/* UPI Modal */}
+        <Modal
+          title="Enter UPI ID"
+          open={showUPIModal}
+          onCancel={() => setShowUPIModal(false)}
+          footer={null}
+          destroyOnClose
+          maskClosable={false}
+        >
+          <div className="space-y-4">
+            <p className="text-gray-600">
+              Please enter your UPI ID. You will be redirected to a secure payment page where you can pay using your card.
+            </p>
+            <Input
+              placeholder="Enter your UPI ID (e.g., name@upi)"
+              value={userUPI}
+              onChange={(e) => setUserUPI(e.target.value)}
+              onPressEnter={() => {
+                if (!userUPI || !userUPI.includes('@')) {
+                  messageApi.error("Please enter a valid UPI ID");
+                  return;
+                }
+                setShowUPIModal(false);
+                handlePayment();
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button onClick={() => setShowUPIModal(false)}>Cancel</Button>
+              <Button 
+                type="primary" 
+                onClick={() => {
+                  if (!userUPI || !userUPI.includes('@')) {
+                    messageApi.error("Please enter a valid UPI ID");
+                    return;
+                  }
+                  setShowUPIModal(false);
+                  handlePayment();
+                }}
+                loading={loading}
+              >
+                Continue to Payment
+              </Button>
+            </div>
+          </div>
+        </Modal>
+
+        {/* Verification Modal */}
+        <Modal
+          title="Processing Payment Request"
+          open={showVerification}
+          footer={null}
+          closable={false}
+          maskClosable={false}
+          destroyOnClose
+        >
+          <div className="text-center py-4">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+            <p className="mt-4 text-gray-600">Creating payment request...</p>
+          </div>
+        </Modal>
+
+        {renderPaymentModal()}
       </div>
     );
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="glass-effect p-8 rounded-xl">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Product Images */}
-          <div className="space-y-4">
-            <img
-              src={product.images?.[0] || "https://via.placeholder.com/600"}
-              alt={product.name}
-              className="w-full h-96 object-cover rounded-lg"
-            />
-            {product.images?.length > 1 && (
-              <div className="grid grid-cols-4 gap-4">
-                {product.images.map((image, index) => (
-                  <img
-                    key={index}
-                    src={image}
-                    alt={`${product.name} - ${index + 1}`}
-                    className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Product Details */}
-          <div className="space-y-6">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800">{product.name}</h1>
-              <p className="text-2xl font-semibold text-primary mt-2">
-                ₹ {product.price}
-              </p>
-            </div>
-
-            <Divider />
-
+    <>
+      <style>{styles}</style>
+      {contextHolder}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="glass-effect p-8 rounded-xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Product Images */}
             <div className="space-y-4">
-              <div>
-                <h2 className="text-lg font-semibold text-gray-700">Description</h2>
-                <p className="text-gray-600 mt-2">{product.description}</p>
-              </div>
-
-              <div>
-                <h2 className="text-lg font-semibold text-gray-700">Details</h2>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div>
-                    <p className="text-gray-600">Category</p>
-                    <p className="font-medium">{product.category}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Age</p>
-                    <p className="font-medium">{product.age} {product.age === 1 ? "year" : "years"}</p>
-                  </div>
-                </div>
-              </div>
-
-              {product.seller && (
-                <div>
-                  <h2 className="text-lg font-semibold text-gray-700">Seller Information</h2>
-                  <div className="mt-2">
-                    <p className="text-gray-600">Name</p>
-                    <p className="font-medium">{product.seller.name}</p>
-                    <p className="text-gray-600 mt-2">Email</p>
-                    <p className="font-medium">{product.seller.email}</p>
-                  </div>
+              <img
+                src={product.images?.[0] || "https://via.placeholder.com/600"}
+                alt={product.name}
+                className="w-full h-96 object-cover rounded-lg"
+              />
+              {product.images?.length > 1 && (
+                <div className="grid grid-cols-4 gap-4">
+                  {product.images.map((image, index) => (
+                    <img
+                      key={index}
+                      src={image}
+                      alt={`${product.name} - ${index + 1}`}
+                      className="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition-opacity"
+                    />
+                  ))}
                 </div>
               )}
+            </div>
 
+            {/* Product Details */}
+            <div className="space-y-6">
               <div>
-                <h2 className="text-lg font-semibold text-gray-700">Availability</h2>
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div>
-                    <p className="text-gray-600">Bill Available</p>
-                    <p className="font-medium">{product.billAvailable ? "Yes" : "No"}</p>
+                <h1 className="text-3xl font-bold text-gray-800">{product.name}</h1>
+                <p className="text-2xl font-semibold text-primary mt-2">
+                  ₹ {product.price}
+                </p>
+              </div>
+
+              <Divider />
+
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-700">Description</h2>
+                  <p className="text-gray-600 mt-2">{product.description}</p>
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-700">Details</h2>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <p className="text-gray-600">Category</p>
+                      <p className="font-medium">{product.category}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Age</p>
+                      <p className="font-medium">{product.age} {product.age === 1 ? "year" : "years"}</p>
+                    </div>
                   </div>
+                </div>
+
+                {product.seller && (
                   <div>
-                    <p className="text-gray-600">Warranty Available</p>
-                    <p className="font-medium">{product.warrantyAvailable ? "Yes" : "No"}</p>
+                    <h2 className="text-lg font-semibold text-gray-700">Seller Information</h2>
+                    <div className="mt-2">
+                      <p className="text-gray-600">Name</p>
+                      <p className="font-medium">{product.seller.name}</p>
+                      <p className="text-gray-600 mt-2">Email</p>
+                      <p className="font-medium">{product.seller.email}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-gray-600">Accessories Available</p>
-                    <p className="font-medium">{product.accessoriesAvailable ? "Yes" : "No"}</p>
-                  </div>
-                  <div>
-                    <p className="text-gray-600">Box Available</p>
-                    <p className="font-medium">{product.boxAvailable ? "Yes" : "No"}</p>
+                )}
+
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-700">Availability</h2>
+                  <div className="grid grid-cols-2 gap-4 mt-2">
+                    <div>
+                      <p className="text-gray-600">Bill Available</p>
+                      <p className="font-medium">{product.billAvailable ? "Yes" : "No"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Warranty Available</p>
+                      <p className="font-medium">{product.warrantyAvailable ? "Yes" : "No"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Accessories Available</p>
+                      <p className="font-medium">{product.accessoriesAvailable ? "Yes" : "No"}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-600">Box Available</p>
+                      <p className="font-medium">{product.boxAvailable ? "Yes" : "No"}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <Divider />
+              <Divider />
 
-            <div className="flex gap-4">
-              <Button type="primary" size="large" className="primary-button">
-                Contact Seller
-              </Button>
-              <Button size="large" onClick={() => navigate("/")}>
-                Back to Home
-              </Button>
+              <div className="flex gap-4">
+                <Button 
+                  type="primary" 
+                  size="large" 
+                  className="primary-button"
+                  onClick={handleContactClick}
+                >
+                  Contact Seller
+                </Button>
+                {renderPaymentButton()}
+                <Button size="large" onClick={() => navigate("/")}>
+                  Back to Home
+                </Button>
+              </div>
             </div>
           </div>
         </div>
+
+        {/* Chat Section */}
+        {showChat && (
+          <div className="glass-effect p-6 rounded-xl mt-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-4">Chat with Seller</h2>
+            <div className="flex flex-col h-[400px]">
+              <div 
+                ref={chatContainerRef}
+                className="flex-1 overflow-y-auto mb-4 space-y-4"
+              >
+                {chatMessages.map(renderChatMessage)}
+              </div>
+              <div className="flex flex-col gap-2">
+                {showBidInput ? (
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Enter bid amount"
+                      value={bidAmount}
+                      onChange={(e) => setBidAmount(e.target.value)}
+                      prefix="₹"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="primary"
+                      onClick={handleBidSubmit}
+                      className="primary-button"
+                    >
+                      Submit Bid
+                    </Button>
+                    <Button onClick={() => setShowBidInput(false)}>
+                      Cancel
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Type your message..."
+                      value={message}
+                      onChange={(e) => setMessage(e.target.value)}
+                      onPressEnter={handleSendMessage}
+                      className="flex-1"
+                    />
+                    <Button
+                      type="primary"
+                      icon={<SendOutlined />}
+                      onClick={handleSendMessage}
+                      className="primary-button"
+                    >
+                      Send
+                    </Button>
+                    <Button onClick={() => setShowBidInput(true)}>
+                      Make an Offer
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Modal */}
+        {renderPaymentModal()}
       </div>
-    </div>
+    </>
   );
 }
 
